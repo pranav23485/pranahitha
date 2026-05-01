@@ -1,0 +1,513 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pranahitha Spectral Insights</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    :root {
+      --primary: #1a6b2e;
+      --accent: #0077b6;
+      --bg: #f0f4f8;
+      --surface: #ffffff;
+      --border: #dee2e6;
+      --text: #1a1a2e;
+      --text-muted: #6c757d;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      height: 100vh; overflow: hidden;
+    }
+    body::before {
+      content: '';
+      position: fixed; inset: 0;
+      background: url('https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/1024px-The_Earth_seen_from_Apollo_17.jpg') center/cover no-repeat;
+      opacity: 0.03; z-index: 0; pointer-events: none;
+    }
+    #splash {
+      position: fixed; inset: 0; z-index: 9999; background: #fff;
+      display: flex; align-items: center; justify-content: center;
+      transition: opacity 1s ease;
+    }
+    #splash img { width: 100vw; height: 100vh; object-fit: cover; opacity: 0.9; }
+    #splash .splash-title {
+      position: absolute; text-align: center;
+      background: rgba(255,255,255,0.9); padding: 2rem 3rem;
+      border-radius: 14px; box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+    }
+    #splash h1 { font-size: 2.8rem; color: var(--primary); font-weight: 700; letter-spacing: 0.08em; }
+    #splash p { color: var(--accent); font-size: 0.95rem; margin-top: 0.4rem; letter-spacing: 0.12em; font-family: monospace; }
+    #splash.hidden { opacity: 0; pointer-events: none; }
+    .glass {
+      background: rgba(255,255,255,0.94);
+      backdrop-filter: blur(14px);
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    }
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #f1f1f1; }
+    ::-webkit-scrollbar-thumb { background: #adb5bd; border-radius: 4px; }
+    #app {
+      position: relative; z-index: 1;
+      display: grid;
+      grid-template-columns: 280px 1fr 330px;
+      height: 100vh;
+    }
+    /* Sidebar accordion */
+    .mode-section { border-bottom: 1px solid var(--border); }
+    .mode-header {
+      width: 100%; text-align: left; padding: 0.75rem 1rem;
+      background: var(--surface); border: none; cursor: pointer;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 0.88rem; font-weight: 600; color: var(--text);
+      display: flex; align-items: center; justify-content: space-between;
+      transition: background 0.2s;
+    }
+    .mode-header:hover { background: #e8f5e9; color: var(--primary); }
+    .mode-header.open { background: #e8f5e9; color: var(--primary); }
+    .mode-header .chevron { transition: transform 0.25s; font-size: 0.7rem; }
+    .mode-header.open .chevron { transform: rotate(180deg); }
+    .mode-body { display: none; padding: 0.75rem 1rem; background: #fafafa; flex-direction: column; gap: 0.65rem; }
+    .mode-body.open { display: flex; }
+
+    /* Buttons */
+    .btn-primary {
+      background: linear-gradient(135deg, #1a6b2e, #2d9e47);
+      border: none; color: #fff;
+      font-size: 0.88rem; font-weight: 600; padding: 0.6rem 1rem;
+      border-radius: 8px; cursor: pointer; width: 100%;
+      transition: all 0.2s; box-shadow: 0 3px 10px rgba(26,107,46,0.25);
+    }
+    .btn-primary:hover { background: linear-gradient(135deg,#155724,#1a6b2e); transform: translateY(-1px); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-secondary {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); font-size: 0.82rem; font-weight: 500;
+      padding: 0.5rem 0.75rem; border-radius: 8px; cursor: pointer;
+      width: 100%; text-align: left; transition: all 0.2s;
+    }
+    .btn-secondary:hover { background: #e8f5e9; border-color: var(--primary); color: var(--primary); }
+    .btn-secondary.active { background: #e8f5e9; border-color: var(--primary); color: var(--primary); font-weight: 600; }
+
+    /* Sub-accordion for persona */
+    .persona-body { display: none; padding: 0.5rem 0 0 0.75rem; flex-direction: column; gap: 0.5rem; }
+    .persona-body.open { display: flex; }
+
+    /* Form elements */
+    select, input[type="text"], input[type="file"] {
+      background: #fff; border: 1px solid var(--border);
+      color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 0.83rem; padding: 0.45rem 0.7rem;
+      border-radius: 8px; width: 100%; outline: none;
+    }
+    select:focus, input[type="text"]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,119,182,0.1); }
+    .section-label {
+      font-size: 0.67rem; letter-spacing: 0.1em; color: var(--text-muted);
+      text-transform: uppercase; font-weight: 600;
+    }
+
+    /* Stat cards */
+    .stat-card {
+      border: 1px solid #e3f2fd; border-radius: 10px; padding: 0.85rem;
+      background: linear-gradient(135deg, #f0f9ff, #e8f5e9);
+    }
+    .stat-value { font-size: 1.8rem; font-weight: 700; color: var(--accent); }
+    .stat-label { font-size: 0.68rem; color: var(--text-muted); letter-spacing: 0.08em; margin-top: 0.2rem; text-transform: uppercase; }
+
+    /* Land cover bar */
+    .lc-bar { height: 8px; border-radius: 4px; transition: width 0.8s ease; }
+
+    /* Accuracy dropdown */
+    .accuracy-box {
+      display: none; background: #fff; border: 1px solid var(--border);
+      border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem;
+      font-size: 0.78rem; line-height: 1.8; box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    .accuracy-box.open { display: block; }
+
+    /* Chat */
+    #chat-messages {
+      flex: 1; overflow-y: auto; padding: 0.75rem;
+      display: flex; flex-direction: column; gap: 0.65rem;
+      background: #f8f9fa; border-radius: 8px; min-height: 0;
+    }
+    .bubble {
+      max-width: 88%; padding: 0.6rem 0.9rem;
+      border-radius: 12px; font-size: 0.83rem; line-height: 1.55; word-break: break-word;
+    }
+    .bubble-user { align-self: flex-end; background: #1a6b2e; color: #fff; border-radius: 12px 12px 2px 12px; }
+    .bubble-ai {
+      align-self: flex-start; background: #fff;
+      border: 1px solid #dee2e6; color: var(--text);
+      border-radius: 12px 12px 12px 2px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .bubble-ai.glow-pulse { animation: pulse-glow 1.5s ease-out; }
+    @keyframes pulse-glow {
+      0% { box-shadow: 0 0 16px rgba(0,119,182,0.4); }
+      100% { box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    }
+    #chat-input {
+      background: #fff; border: 1px solid var(--border); color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif; font-size: 0.88rem;
+      padding: 0.55rem 0.85rem; border-radius: 8px; outline: none; flex: 1;
+    }
+    #chat-input::placeholder { color: #adb5bd; }
+    #chat-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,119,182,0.1); }
+    #send-btn {
+      background: var(--accent); border: none; color: #fff;
+      font-size: 0.83rem; font-weight: 600; padding: 0.55rem 1rem;
+      border-radius: 8px; cursor: pointer; transition: all 0.2s;
+    }
+    #send-btn:hover { background: #005f8e; }
+
+    /* Modal */
+    #accuracy-modal { display: none; position: fixed; inset: 0; z-index: 1000; align-items: center; justify-content: center; background: rgba(0,0,0,0.4); }
+    #accuracy-modal.open { display: flex; }
+    .modal-box { border-radius: 12px; padding: 2rem; min-width: 320px; background: #fff; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+
+    /* Viewport */
+    #viewport-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: none; z-index: 2; background: #000; }
+    #viewport-image.visible { display: block; }
+    #viewport-overlay { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+
+    /* Spinner */
+    .spinner { width: 13px; height: 13px; border: 2px solid rgba(0,119,182,0.2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-row { display: none; align-items: center; gap: 0.5rem; color: var(--accent); font-size: 0.78rem; }
+    .loading-row.active { display: flex; }
+
+    /* Trend modal */
+    #trend-modal {
+      display: none; position: fixed; inset: 0; z-index: 1100;
+      align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.5);
+    }
+    #trend-modal .trend-box {
+      background: #fff; border-radius: 14px; padding: 1.5rem;
+      width: min(560px, 95vw); max-height: 85vh; overflow-y: auto;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+    }
+  </style>
+</head>
+<body>
+
+<!-- Splash -->
+<div id="splash">
+  <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/1024px-The_Earth_seen_from_Apollo_17.jpg" alt="Earth" />
+  <div class="splash-title">
+    <h1>🌍 PRANAHITHA</h1>
+    <p>SPECTRAL INSIGHTS // INITIALIZING</p>
+  </div>
+</div>
+
+<!-- Trend / Change Detection Modal -->
+<div id="trend-modal" onclick="if(event.target===this)closeTrendModal()">
+  <div class="trend-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
+      <span style="font-size:0.9rem;font-weight:700;color:var(--primary);">📈 Change Detection &amp; Trend Analysis</span>
+      <div style="display:flex;gap:0.5rem;align-items:center;">
+        <button onclick="clearHistory()" title="Clear all history and start fresh"
+          style="background:#fef2f2;border:1px solid #fecaca;color:#dc2626;border-radius:6px;padding:2px 10px;font-size:0.72rem;cursor:pointer;font-weight:600;">🗑 Clear</button>
+        <button onclick="closeTrendModal()" style="background:transparent;border:none;font-size:1.1rem;cursor:pointer;color:var(--text-muted);">✕</button>
+      </div>
+    </div>
+    <div id="trend-content" style="font-size:0.82rem;line-height:1.7;color:var(--text);"></div>
+    <div style="margin-top:1rem;font-size:0.7rem;color:var(--text-muted);">
+      Legend: <span style="color:#2d9e47;font-weight:600;">■ Vegetation</span>
+      <span style="color:#0077b6;font-weight:600;margin-left:0.5rem;">■ Water</span>
+      <span style="color:#e07b39;font-weight:600;margin-left:0.5rem;">■ Urban</span>
+      <span style="color:#a0785a;font-weight:600;margin-left:0.5rem;">■ Bare Soil</span>
+    </div>
+  </div>
+</div>
+
+<!-- Accuracy Modal -->
+<div id="accuracy-modal">
+  <div class="modal-box">
+    <p class="section-label" style="color:var(--accent);margin-bottom:1rem;">ⓘ Algorithm Accuracy Report</p>
+    <table style="width:100%;border-collapse:collapse;font-size:0.88rem;line-height:2.2;">
+      <tr><td style="color:var(--text-muted);">Algorithm</td><td style="color:var(--primary);font-weight:600;">Sentinel-2 Band Math</td></tr>
+      <tr><td style="color:var(--text-muted);">Precision</td><td style="color:var(--primary);font-weight:600;">10m / px</td></tr>
+      <tr><td style="color:var(--text-muted);">Confidence</td><td style="color:var(--primary);font-weight:600;">94%</td></tr>
+      <tr><td style="color:var(--text-muted);">Improvement</td><td style="color:var(--primary);font-weight:600;">Apply Sen2Cor atmospheric correction</td></tr>
+    </table>
+    <button onclick="document.getElementById('accuracy-modal').classList.remove('open')"
+      style="margin-top:1.5rem;width:100%;padding:0.6rem;border:none;background:var(--accent);color:#fff;border-radius:8px;cursor:pointer;font-weight:600;">CLOSE</button>
+  </div>
+</div>
+
+<div id="app">
+<!-- LEFT: Sidebar -->
+<aside class="glass" style="border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;">
+  <div style="padding:1rem 1.1rem 0.75rem;border-bottom:1px solid var(--border);">
+    <div style="font-size:1.1rem;font-weight:700;color:var(--primary);">🌍 PRANAHITHA</div>
+    <div style="font-size:0.62rem;color:var(--text-muted);letter-spacing:0.12em;margin-top:2px;">SPECTRAL INSIGHTS v1.0</div>
+  </div>
+
+  <!-- MODE 1: Universal Telemetry -->
+  <div class="mode-section">
+    <button class="mode-header" onclick="toggleMode('m1')">
+      <span>◈ Mode 1 — Universal Telemetry</span>
+      <span class="chevron">▼</span>
+    </button>
+    <div class="mode-body" id="m1">
+      <p style="font-size:0.76rem;color:var(--text-muted);line-height:1.5;">Upload one or more satellite images (JPEG/PNG/GeoTIFF). Multiple images enable change detection &amp; trend analysis.</p>
+      <label class="section-label">Upload Satellite Image(s)</label>
+      <input type="file" accept=".tif,.tiff,.jpg,.jpeg,.png,.zip" id="upload-input" multiple />
+      <div class="loading-row" id="upload-loader"><div class="spinner"></div><span>Validating &amp; analysing...</span></div>
+      <button class="btn-primary" onclick="uploadFile()">⬆ UPLOAD &amp; ANALYSE</button>
+      <div id="upload-status" style="font-size:0.74rem;display:none;"></div>
+    </div>
+  </div>
+
+  <!-- MODE 2: Scenario Analysis -->
+  <div class="mode-section">
+    <button class="mode-header" onclick="toggleMode('m2')">
+      <span>◈ Mode 2 — Scenario Analysis</span>
+      <span class="chevron">▼</span>
+    </button>
+    <div class="mode-body" id="m2">
+      <label class="section-label">Select Scenario</label>
+      <select id="scenario-select" onchange="onScenarioChange()">
+        <option value="">— Choose a scenario —</option>
+        <option value="ndvi">🌿 Vegetation → NDVI</option>
+        <option value="ndwi">💧 Water → NDWI</option>
+        <option value="defence">🛡 Defence → False Color + SWIR</option>
+        <option value="encroachment">🏗 Encroachment → True Color + NDVI</option>
+        <option value="flood">🌊 Flood → NDWI Timeline</option>
+        <option value="wildfire">🔥 Wildfire → SWIR</option>
+      </select>
+      <div id="scenario-upload-area" style="display:none;flex-direction:column;gap:0.6rem;">
+        <label class="section-label" id="scenario-upload-label">Upload Satellite Image</label>
+        <input type="file" accept=".tif,.tiff,.jpg,.jpeg,.png,.zip" id="scenario-upload-input" multiple />
+        <div class="loading-row" id="scenario-loader"><div class="spinner"></div><span>Running scenario analysis...</span></div>
+        <button class="btn-primary" id="run-btn" onclick="runScenarioAnalysis()">▶ RUN ANALYSIS</button>
+        <div id="scenario-status" style="font-size:0.74rem;display:none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODE 3: Persona Dashboards -->
+  <div class="mode-section">
+    <button class="mode-header" onclick="toggleMode('m3')">
+      <span>◈ Mode 3 — Persona Dashboards</span>
+      <span class="chevron">▼</span>
+    </button>
+    <div class="mode-body" id="m3">
+
+      <!-- 3.1 Natural Resources — Deforestation Heatmap -->
+      <button class="btn-secondary" onclick="togglePersona('p-nr', this)">
+        🌲 Natural Resources <span style="font-size:0.72rem;color:var(--text-muted);">(Deforestation Heatmap)</span>
+      </button>
+      <div class="persona-body" id="p-nr">
+        <p style="font-size:0.72rem;color:var(--text-muted);line-height:1.5;">
+          Upload <strong>2 images</strong> of the same forest at different times.<br/>
+          <em>Image 1 = Baseline (older) · Image 2 = Current (recent)</em><br/>
+          Renders a red heatmap over areas where tree cover was lost.
+        </p>
+        <label class="section-label">📅 Baseline Image (older)</label>
+        <input type="file" accept=".tif,.tiff,.jpg,.jpeg,.png,.zip" id="nr-file1" />
+        <label class="section-label" style="margin-top:0.3rem;">📅 Current Image (recent)</label>
+        <input type="file" accept=".tif,.tiff,.jpg,.jpeg,.png,.zip" id="nr-file2" />
+        <div class="loading-row" id="nr-loader"><div class="spinner"></div><span>Analysing deforestation...</span></div>
+        <button class="btn-primary" onclick="runSpecialAnalysis('deforestation','nr-file1','nr-file2','nr-loader','nr-result')">🌲 DETECT DEFORESTATION</button>
+        <div id="nr-result"></div>
+      </div>
+
+      <!-- 3.2 Civic Planning — Lake Encroachment -->
+      <button class="btn-secondary" onclick="togglePersona('p-cp', this)">
+        🏙 Civic Planning <span style="font-size:0.72rem;color:var(--text-muted);">(Lake Encroachment)</span>
+      </button>
+      <div class="persona-body" id="p-cp">
+        <p style="font-size:0.72rem;color:var(--text-muted);line-height:1.5;">
+          Upload <strong>2 images</strong> of the same lake/water body at different times.<br/>
+          <em>Image 1 = Baseline (older) · Image 2 = Current (recent)</em><br/>
+          Calculates water area lost in hectares and highlights encroached zones.
+        </p>
+        <label class="section-label">📅 Baseline Image (older)</label>
+        <input type="file" accept=".tif,.tiff,.jpg,.jpeg,.png,.zip" id="cp-file1" />
+        <label class="section-label" style="margin-top:0.3rem;">📅 Current Image (recent)</label>
+        <input type="file" accept=".tif,.tiff,.jpg,.jpeg,.png,.zip" id="cp-file2" />
+        <div class="loading-row" id="cp-loader"><div class="spinner"></div><span>Analysing encroachment...</span></div>
+        <button class="btn-primary" onclick="runSpecialAnalysis('encroachment','cp-file1','cp-file2','cp-loader','cp-result')">💧 DETECT ENCROACHMENT</button>
+        <div id="cp-result"></div>
+      </div>
+
+      <!-- 3.3 Defence — Camouflage Detector -->
+      <button class="btn-secondary" onclick="togglePersona('p-def', this)">
+        🪖 Defence <span style="font-size:0.72rem;color:var(--text-muted);">(Camouflage Detector)</span>
+      </button>
+      <div class="persona-body" id="p-def">
+        <p style="font-size:0.72rem;color:var(--text-muted);line-height:1.5;">
+          Upload <strong>1 image</strong> of terrain to scan for camouflage signatures.<br/>
+          <em>Best with aerial/satellite images of forested or mixed terrain.</em><br/>
+          Detects high-green + low-NDVI pixels — spectral signature of camouflage paint.
+        </p>
+        <label class="section-label">🛰 Terrain Image</label>
+        <input type="file" accept=".tif,.tiff,.jpg,.jpeg,.png,.zip" id="def-file1" />
+        <div class="loading-row" id="def-loader"><div class="spinner"></div><span>Scanning for camouflage...</span></div>
+        <button class="btn-primary" onclick="runSpecialAnalysis('camouflage','def-file1',null,'def-loader','def-result')">🪖 SCAN FOR CAMOUFLAGE</button>
+        <div id="def-result"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODE 4: AI Auto-Fetch -->
+  <div class="mode-section">
+    <button class="mode-header" onclick="toggleMode('m4')">
+      <span>◈ Mode 4 — AI Auto-Fetch</span>
+      <span class="chevron">▼</span>
+    </button>
+    <div class="mode-body" id="m4">
+      <p style="font-size:0.76rem;color:var(--text-muted);line-height:1.5;">
+        Type any region name + date range. Pranahitha fetches real Sentinel-2 scenes and runs full spectral analysis automatically.
+      </p>
+      <label class="section-label">Region / Place Name</label>
+      <input type="text" id="m4-place" placeholder="e.g. Nalamala Forest, Andhra Pradesh" />
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;">
+        <div>
+          <label class="section-label" style="margin-bottom:3px;display:block;">From</label>
+          <input type="text" id="m4-from" placeholder="YYYY-MM-DD" value="2022-01-01" />
+        </div>
+        <div>
+          <label class="section-label" style="margin-bottom:3px;display:block;">To</label>
+          <input type="text" id="m4-to" placeholder="YYYY-MM-DD" value="2024-12-31" />
+        </div>
+      </div>
+      <div>
+        <label class="section-label" style="margin-bottom:3px;display:block;">Max Cloud % (auto-relaxes if needed)</label>
+        <select id="m4-cloud">
+          <option value="10">10%</option>
+          <option value="15" selected>15%</option>
+          <option value="25">25%</option>
+          <option value="40">40%</option>
+        </select>
+      </div>
+      <div class="loading-row" id="m4-loader"><div class="spinner"></div><span id="m4-loader-text">Fetching scenes...</span></div>
+      <button class="btn-primary" id="m4-btn" onclick="runAutoFetch()">⚡ AUTO-FETCH &amp; ANALYSE</button>
+      <div id="m4-status" style="font-size:0.74rem;display:none;"></div>
+    </div>
+  </div>
+
+  <div style="margin-top:auto;padding:0.85rem 1rem;font-size:0.64rem;color:var(--text-muted);line-height:1.9;border-top:1px solid var(--border);">
+    🛰 SENSOR: Sentinel-2 L2A<br/>
+    📅 EPOCH: 2024-01-01 / 2024-02-01
+  </div>
+</aside>
+
+<!-- CENTER: Satellite Viewport -->
+<main style="position:relative;overflow:hidden;border-right:1px solid var(--border);background:#1a1a2e;">
+  <div style="position:absolute;inset:0;background:url('https://upload.wikimedia.org/wikipedia/commons/thumb/9/97/The_Earth_seen_from_Apollo_17.jpg/1024px-The_Earth_seen_from_Apollo_17.jpg') center/cover no-repeat;opacity:0.22;"></div>
+  <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(26,26,46,0.2),rgba(26,26,46,0.5));"></div>
+  <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.025) 1px,transparent 1px);background-size:40px 40px;z-index:1;"></div>
+  <img id="viewport-image" alt="Uploaded satellite image" />
+  <div id="viewport-overlay">
+    <div style="position:absolute;top:1.1rem;left:1.1rem;background:rgba(255,255,255,0.92);padding:0.35rem 0.85rem;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,0.12);">
+      <span style="font-size:0.68rem;letter-spacing:0.08em;color:var(--primary);font-weight:600;">◉ SATELLITE IMAGERY VIEWPORT</span>
+    </div>
+    <div id="crosshair" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;">
+      <div style="width:56px;height:56px;border:1px solid rgba(255,255,255,0.28);border-radius:50%;position:relative;">
+        <div style="position:absolute;top:50%;left:-8px;right:-8px;height:1px;background:rgba(255,255,255,0.28);"></div>
+        <div style="position:absolute;left:50%;top:-8px;bottom:-8px;width:1px;background:rgba(255,255,255,0.28);"></div>
+      </div>
+    </div>
+    <div style="position:absolute;bottom:1.1rem;left:1.1rem;background:rgba(0,0,0,0.48);padding:0.28rem 0.7rem;border-radius:20px;">
+      <span id="viewport-coords" style="font-size:0.68rem;color:rgba(255,255,255,0.75);">AWAITING IMAGE</span>
+    </div>
+    <div id="viewport-status" style="position:absolute;bottom:1.1rem;right:1.1rem;background:rgba(0,0,0,0.48);padding:0.28rem 0.7rem;border-radius:20px;font-size:0.68rem;color:rgba(255,255,255,0.6);">
+      AWAITING ANALYSIS
+    </div>
+  </div>
+</main>
+
+<!-- RIGHT: Stats + Chat -->
+<aside class="glass" style="display:flex;flex-direction:column;padding:1rem;gap:0.85rem;overflow:hidden;">
+
+  <!-- Telemetry -->
+  <div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.6rem;">
+      <span class="section-label">Telemetry Output</span>
+      <div style="display:flex;gap:0.4rem;">
+        <button onclick="openTrendModal()" title="Change Detection &amp; Trend Analysis"
+          style="background:transparent;border:1px solid var(--border);color:#16a34a;border-radius:50%;width:22px;height:22px;font-size:0.75rem;cursor:pointer;font-weight:600;">📈</button>
+        <button onclick="document.getElementById('accuracy-modal').classList.add('open')"
+          style="background:transparent;border:1px solid var(--border);color:var(--accent);border-radius:50%;width:22px;height:22px;font-size:0.75rem;cursor:pointer;font-weight:600;">ⓘ</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.6rem;">
+      <div class="stat-card">
+        <div class="stat-value" id="ndvi-display">--</div>
+        <div class="stat-label">NDVI Score</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" id="ndwi-display">--</div>
+        <div class="stat-label">NDWI Score</div>
+      </div>
+      <div class="stat-card" style="grid-column:span 2;background:#f8f9fa;padding:0.6rem 0.85rem;">
+        <div style="font-size:0.72rem;color:var(--text-muted);" id="sensor-display">SENSOR: --</div>
+      </div>
+    </div>
+
+    <!-- Land Cover Percentages -->
+    <div id="land-cover-panel" style="display:none;margin-top:0.75rem;background:#f8f9fa;border:1px solid var(--border);border-radius:10px;padding:0.75rem;">
+      <div class="section-label" style="margin-bottom:0.5rem;">Land Cover Breakdown</div>
+      <div style="display:flex;flex-direction:column;gap:0.45rem;" id="lc-bars"></div>
+    </div>
+
+    <!-- Land Summary -->
+    <div id="land-summary-panel" style="display:none;margin-top:0.6rem;border-radius:10px;overflow:hidden;border:1px solid #fde68a;">
+      <div style="background:#fef3c7;padding:0.5rem 0.75rem;display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="toggleSummaryBox()">
+        <span style="font-size:0.72rem;font-weight:600;color:#92400e;">📋 Preliminary Land Summary</span>
+        <span id="summary-chevron" style="font-size:0.65rem;color:#92400e;transition:transform 0.2s;">▼</span>
+      </div>
+      <div id="summary-body" style="display:none;padding:0.75rem;background:#fffbeb;font-size:0.76rem;line-height:1.65;color:#1a1a2e;">
+        <div id="summary-geo-type" style="font-weight:600;color:#1a6b2e;margin-bottom:0.3rem;"></div>
+        <div id="summary-geo-state" style="color:#0077b6;margin-bottom:0.5rem;font-style:italic;"></div>
+        <div id="summary-text" style="margin-bottom:0.6rem;"></div>
+        <div id="summary-disclaimer" style="background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:0.5rem;font-size:0.71rem;color:#991b1b;line-height:1.5;"></div>
+      </div>
+    </div>
+
+    <!-- Inline accuracy info -->
+    <div style="margin-top:0.5rem;">
+      <button onclick="toggleAccuracyBox()" style="background:transparent;border:none;color:var(--accent);font-size:0.75rem;cursor:pointer;padding:0;display:flex;align-items:center;gap:0.3rem;">
+        ⓘ <span>Analysis accuracy &amp; methodology</span>
+      </button>
+      <div class="accuracy-box" id="inline-accuracy">
+        <table style="width:100%;border-collapse:collapse;line-height:2;">
+          <tr><td style="color:var(--text-muted);width:45%;">Algorithm</td><td style="color:var(--primary);font-weight:600;">Sentinel-2 Band Math</td></tr>
+          <tr><td style="color:var(--text-muted);">Precision</td><td style="color:var(--primary);font-weight:600;">10m / px</td></tr>
+          <tr><td style="color:var(--text-muted);">Confidence</td><td style="color:var(--primary);font-weight:600;">94%</td></tr>
+          <tr><td style="color:var(--text-muted);">Improvement</td><td style="color:var(--primary);font-weight:600;">Apply Sen2Cor</td></tr>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:1px;background:var(--border);flex-shrink:0;"></div>
+
+  <!-- AI Chatbot -->
+  <div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+    <div class="section-label" style="margin-bottom:0.6rem;">◈ AI Tactical Chatbot</div>
+    <div id="chat-messages">
+      <div class="bubble bubble-ai">Pranahitha Tactical AI online. Upload a satellite image or run an analysis to receive spectral insights.</div>
+    </div>
+    <div style="margin-top:0.65rem;display:flex;gap:0.45rem;flex-shrink:0;">
+      <input type="text" id="chat-input" placeholder="Ask the tactical AI..." onkeydown="if(event.key==='Enter') sendChat()" />
+      <button id="send-btn" onclick="sendChat()">SEND</button>
+    </div>
+  </div>
+
+</aside>
+</div>
+
+<script src="app.js?v=2"></script>
+</body>
+</html>
+

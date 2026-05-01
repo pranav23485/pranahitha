@@ -1,0 +1,11 @@
+fastapi
+rasterio
+uvicorn
+pydantic
+pystac-client
+planetary-computer
+numpy
+google-generativeai
+python-multipart
+Pillow
+httpx
